@@ -3,76 +3,66 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ano-Chat (1.1.3)</title>
+<title>Ano-Chat (1.2.0)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     background: #ffffff;
     color: #333;
     line-height: 1.5;
+    overscroll-behavior-y: contain;
   }
-
   .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 40px 20px;
+    padding: 20px 16px 32px;
   }
-
   header {
-    margin-bottom: 40px;
+    margin-bottom: 20px;
     border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 20px;
+    padding-bottom: 12px;
   }
-
   header h1 {
-    font-size: 2em;
-    font-weight: 400;
+    font-size: 1.7em;
+    font-weight: 500;
     letter-spacing: 0.5px;
   }
-
   header p {
-    font-size: 0.9em;
+    font-size: 0.85em;
     color: #666;
-    margin-top: 8px;
+    margin-top: 6px;
   }
-
   .main-grid {
     display: grid;
     grid-template-columns: 1fr 2fr;
-    gap: 40px;
+    gap: 20px;
   }
-
   @media (max-width: 768px) {
     .main-grid { grid-template-columns: 1fr; }
   }
-
   .panel {
     border: 1px solid #e0e0e0;
-    padding: 20px;
+    padding: 16px;
     background: #fafafa;
   }
-
   .panel-title {
-    font-size: 0.9em;
+    font-size: 0.85em;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #333;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 10px;
+    padding-bottom: 6px;
   }
-
   label {
     display: block;
-    margin-top: 16px;
-    font-size: 0.85em;
+    margin-top: 12px;
+    font-size: 0.8em;
     font-weight: 500;
     color: #333;
   }
-
   input[type="text"],
   input[type="password"] {
     width: 100%;
@@ -83,151 +73,141 @@
     font-size: 0.9em;
     font-family: inherit;
   }
-
   input[type="text"]:focus,
   input[type="password"]:focus {
     outline: none;
     border: 1px solid #333;
   }
-
   input[type="checkbox"] {
     margin-right: 8px;
     cursor: pointer;
     width: 16px;
     height: 16px;
   }
-
   .checkbox-label {
     display: flex;
     align-items: center;
-    margin-top: 12px;
-    font-size: 0.9em;
+    margin-top: 10px;
+    font-size: 0.85em;
     cursor: pointer;
   }
-
   .button-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 16px;
+    gap: 8px;
+    margin-top: 14px;
   }
-
   button {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 1px solid #333;
     background: #fff;
     color: #333;
     font-weight: 500;
-    font-size: 0.9em;
+    font-size: 0.85em;
     cursor: pointer;
     transition: all 0.15s ease;
     font-family: inherit;
   }
-
   button:hover:not(:disabled) {
     background: #333;
     color: #fff;
   }
-
   button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
-
   #leaveBtn {
-    grid-column: 1 / -1;
     margin-top: 8px;
+    width: 100%;
   }
-
   .info-text {
-    margin-top: 16px;
+    margin-top: 12px;
     font-size: 0.8em;
     color: #666;
     line-height: 1.6;
   }
-
   .version {
-    margin-top: 16px;
-    padding-top: 12px;
+    margin-top: 14px;
+    padding-top: 10px;
     border-top: 1px solid #e0e0e0;
     font-size: 0.75em;
     color: #999;
   }
-
   #messages {
-    height: 500px;
+    height: 400px;
     overflow-y: auto;
     border: 1px solid #e0e0e0;
     padding: 0;
     background: #fff;
     display: flex;
     flex-direction: column;
-    gap: 0;
   }
-
+  @media (max-height: 700px) {
+    #messages { height: 320px; }
+  }
   #messages::-webkit-scrollbar {
     width: 6px;
   }
-
   #messages::-webkit-scrollbar-track {
     background: #f5f5f5;
   }
-
   #messages::-webkit-scrollbar-thumb {
     background: #ccc;
   }
-
   #messages::-webkit-scrollbar-thumb:hover {
     background: #999;
   }
-
   .msg {
-    padding: 12px 16px;
+    padding: 10px 14px;
     border-bottom: 1px solid #f0f0f0;
-    border-left: none;
   }
-
   .msg:last-child {
     border-bottom: none;
   }
-
   .msg-user {
     font-weight: 600;
-    font-size: 0.85em;
+    font-size: 0.8em;
     color: #333;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
-
   .msg-content {
     font-size: 0.9em;
     color: #333;
     word-wrap: break-word;
   }
-
-  .msg-time {
-    font-size: 0.75em;
-    color: #999;
-    margin-top: 4px;
+  .msg-content a {
+    text-decoration: underline;
   }
-
+  .msg-time {
+    font-size: 0.72em;
+    color: #999;
+    margin-top: 3px;
+  }
   .meta {
-    padding: 10px 16px;
+    padding: 8px 14px;
     border-bottom: 1px solid #f0f0f0;
     color: #666;
     font-size: 0.8em;
     background: #fafafa;
   }
-
-  .meta:last-child {
-    border-bottom: none;
+  .system-msg {
+    padding: 6px 14px;
+    font-size: 0.75em;
+    color: #777;
+    text-align: center;
+    background: #f5f5f5;
+    border-bottom: 1px solid #eee;
   }
-
+  .message-input-wrapper {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding-top: 10px;
+  }
   .message-input-group {
     display: flex;
     gap: 8px;
-    margin-top: 12px;
   }
-
   #messageIn {
     flex: 1;
     padding: 8px 10px;
@@ -235,48 +215,77 @@
     background: #fff;
     font-size: 0.9em;
     font-family: inherit;
+    resize: none;
+    min-height: 36px;
+    max-height: 120px;
+    line-height: 1.4;
   }
-
   #messageIn:focus {
     outline: none;
     border: 1px solid #333;
   }
-
   .action-buttons {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
   }
-
   #sendBtn, #saveBtn {
-    padding: 8px 12px;
+    padding: 7px 10px;
     border: 1px solid #333;
     background: #fff;
     color: #333;
     font-weight: 500;
-    font-size: 0.9em;
+    font-size: 0.8em;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.15s ease;
   }
-
-  #sendBtn:hover:not(:disabled) {
-    background: #333;
-    color: #fff;
-  }
-
+  #sendBtn:hover:not(:disabled),
   #saveBtn:hover:not(:disabled) {
     background: #333;
     color: #fff;
   }
-
   #sendBtn:disabled, #saveBtn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
-
   .chat-container {
     display: flex;
     flex-direction: column;
+  }
+  #adminPanel {
+    margin-top: 12px;
+  }
+  #userList {
+    margin-top: 8px;
+    font-size: 0.8em;
+  }
+  .user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .user-name {
+    max-width: 70%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .user-badge {
+    font-size: 0.7em;
+    color: #888;
+    margin-left: 6px;
+  }
+  .kick-btn {
+    border: 1px solid #c00;
+    color: #c00;
+    font-size: 0.75em;
+    padding: 3px 8px;
+  }
+  .kick-btn:hover:not(:disabled) {
+    background: #c00;
+    color: #fff;
   }
 </style>
 </head>
@@ -285,7 +294,7 @@
 <div class="container">
   <header>
     <h1>Ano-Chat</h1>
-    <p>End-to-end encrypted ephemeral messaging</p>
+    <p>Version 1.2.0 is out! Bringing many anticipated features!</p>
   </header>
 
   <div class="main-grid">
@@ -321,19 +330,27 @@
           Share the 16-character code and password with others to invite them to your chat.
         </div>
 
-        <div class="version">v1.1.3</div>
+        <div class="version">v1.2.0</div>
+      </div>
+
+      <div class="panel" id="adminPanel" style="display:none;">
+        <div class="panel-title">Room Control</div>
+        <div class="info-text">
+          Online: <span id="onlineCount">0</span>
+        </div>
+        <div id="userList"></div>
       </div>
     </div>
 
     <div class="chat-container">
       <div class="panel" style="flex: 1; display: flex; flex-direction: column; padding: 0;">
-        <div class="panel-title" style="margin: 0; padding: 16px; background: #fafafa; border-bottom: 1px solid #e0e0e0;">Messages</div>
+        <div class="panel-title" style="margin: 0; padding: 12px 14px; background: #fafafa; border-bottom: 1px solid #e0e0e0;">Messages</div>
         <div id="messages"></div>
       </div>
 
-      <div style="margin-top: 12px;">
+      <div class="message-input-wrapper">
         <div class="message-input-group">
-          <input id="messageIn" type="text" placeholder="Type message..." />
+          <textarea id="messageIn" placeholder="Type message..."></textarea>
           <div class="action-buttons">
             <button id="sendBtn" disabled>Send</button>
             <button id="saveBtn" disabled>Save</button>
@@ -357,11 +374,16 @@ const MESSAGE_INPUT = document.getElementById('messageIn');
 const SEND_BTN = document.getElementById('sendBtn');
 const SAVE_BTN = document.getElementById('saveBtn');
 const MESSAGES = document.getElementById('messages');
+const ADMIN_PANEL = document.getElementById('adminPanel');
+const ONLINE_COUNT = document.getElementById('onlineCount');
+const USER_LIST = document.getElementById('userList');
 
 let ws = null;
 let currentRoom = null;
 let joined = false;
 let receivedMessages = [];
+let myId = null;
+let isCreator = false;
 
 CREATE_BTN.disabled = true;
 JOIN_BTN.disabled = true;
@@ -381,14 +403,43 @@ function addLog(text) {
   MESSAGES.scrollTop = MESSAGES.scrollHeight;
 }
 
+function addSystem(text) {
+  const d = document.createElement('div');
+  d.className = 'system-msg';
+  d.textContent = text;
+  MESSAGES.appendChild(d);
+  MESSAGES.scrollTop = MESSAGES.scrollHeight;
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+}
+
+function linkify(text) {
+  return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+
 function appendMessage(displayName, text, meta) {
   const d = document.createElement('div');
   d.className = 'msg';
-  d.innerHTML = `<div style="font-weight:600">${displayName || 'Anonymous'}</div>
-                 <div>${text}</div>
-                 <div class="meta">${meta || ''}</div>`;
+  const safe = linkify(escapeHtml(text));
+  const user = escapeHtml(displayName || 'Anonymous');
+  const time = escapeHtml(meta || '');
+  d.innerHTML = `<div class="msg-user">${user}</div>
+                 <div class="msg-content">${safe}</div>
+                 <div class="msg-time">${time}</div>`;
   MESSAGES.appendChild(d);
   MESSAGES.scrollTop = MESSAGES.scrollHeight;
+
+  if (document.hidden && "Notification" in window && Notification.permission === "granted") {
+    new Notification(displayName || "Anonymous", { body: text.slice(0, 80) });
+  }
 }
 
 function abToBase64(buf) {
@@ -456,22 +507,37 @@ function connectWs() {
     let d;
     try { d = JSON.parse(ev.data); } catch { return; }
 
+    if (d.type === 'hello') {
+      myId = d.id;
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+      return;
+    }
+
     if (d.type === 'created') {
       addLog('Room created: ' + d.room);
-    } else if (d.type === 'joined') {
+      return;
+    }
+
+    if (d.type === 'joined') {
       addLog('Joined room: ' + d.room);
-    } else if (d.type === 'no-room') {
+      return;
+    }
+
+    if (d.type === 'no-room') {
       addLog('Room does not exist: ' + d.room);
       alert('Room not found.');
       leaveRoomLocal();
-    } else if (d.type === 'message') {
+      return;
+    }
+
+    if (d.type === 'message') {
       if (d.room !== currentRoom) return;
       const decrypted = await decryptMessage(d.iv, d.ciphertext, PASSWORD_INPUT.value, d.room);
-      appendMessage(
-        (ANON_CHECK.checked || !d.username) ? null : d.username,
-        decrypted === null ? '[decryption failed — wrong password?]' : decrypted,
-        new Date().toLocaleTimeString()
-      );
+      const display = decrypted === null ? '[decryption failed — wrong password?]' : decrypted;
+      const displayName = (ANON_CHECK.checked || !d.username) ? null : d.username;
+      appendMessage(displayName, display, new Date().toLocaleTimeString());
       receivedMessages.push({
         time: new Date().toISOString(),
         room: d.room,
@@ -480,7 +546,38 @@ function connectWs() {
         iv: d.iv,
         plaintextIfDecrypted: decrypted
       });
+      SAVE_BTN.disabled = true === false;
       SAVE_BTN.disabled = false;
+      return;
+    }
+
+    if (d.type === 'users') {
+      if (d.room !== currentRoom) return;
+      ONLINE_COUNT.textContent = d.users.length;
+      renderUserList(d.users);
+      return;
+    }
+
+    if (d.type === 'event') {
+      if (d.room !== currentRoom) return;
+      const name = d.username || 'Anonymous';
+      if (d.event === 'join') addSystem(`${name} joined the room`);
+      else if (d.event === 'leave') addSystem(`${name} left the room`);
+      else if (d.event === 'kick') addSystem(`${name} was kicked`);
+      return;
+    }
+
+    if (d.type === 'kicked') {
+      if (d.room !== currentRoom) return;
+      addSystem('You were kicked from the room');
+      leaveRoomLocal();
+      alert('You were kicked from the room.');
+      return;
+    }
+
+    if (d.type === 'error') {
+      addLog('Server error: ' + (d.message || ''));
+      return;
     }
   });
 
@@ -488,7 +585,7 @@ function connectWs() {
     addLog('Disconnected from server');
     CREATE_BTN.disabled = true;
     JOIN_BTN.disabled = true;
-    setTimeout(connectWs, 500);
+    setTimeout(connectWs, 1000);
   });
 
   ws.addEventListener('error', () => {});
@@ -501,12 +598,19 @@ function sendToServer(obj) {
 
 connectWs();
 
+function getCurrentUsername() {
+  if (ANON_CHECK.checked) return null;
+  return USERNAME_INPUT.value.trim() || 'User';
+}
+
 CREATE_BTN.addEventListener('click', () => {
   const room = genRoomCode();
   ROOM_INPUT.value = room;
   currentRoom = room;
   receivedMessages = [];
-  sendToServer({ type: 'create', room });
+  isCreator = true;
+  ADMIN_PANEL.style.display = 'block';
+  sendToServer({ type: 'create', room, username: getCurrentUsername() });
   joined = true;
   SEND_BTN.disabled = false;
   LEAVE_BTN.disabled = false;
@@ -518,9 +622,11 @@ JOIN_BTN.addEventListener('click', () => {
   if (!room || room.length !== 16) return alert('Paste a 16-char room code');
   currentRoom = room;
   receivedMessages = [];
+  isCreator = false;
+  ADMIN_PANEL.style.display = 'none';
   sendToServer({ type: 'exists', room });
   setTimeout(() => {
-    sendToServer({ type: 'join', room });
+    sendToServer({ type: 'join', room, username: getCurrentUsername() });
     joined = true;
     SEND_BTN.disabled = false;
     LEAVE_BTN.disabled = false;
@@ -529,7 +635,7 @@ JOIN_BTN.addEventListener('click', () => {
 });
 
 LEAVE_BTN.addEventListener('click', () => {
-  sendToServer({ type: 'leave', room: currentRoom });
+  if (currentRoom) sendToServer({ type: 'leave', room: currentRoom });
   leaveRoomLocal();
   addLog('Left room.');
 });
@@ -542,6 +648,10 @@ function leaveRoomLocal() {
   MESSAGES.innerHTML = '';
   receivedMessages = [];
   SAVE_BTN.disabled = true;
+  ONLINE_COUNT.textContent = '0';
+  USER_LIST.innerHTML = '';
+  isCreator = false;
+  ADMIN_PANEL.style.display = 'none';
 }
 
 SEND_BTN.addEventListener('click', async () => {
@@ -549,16 +659,16 @@ SEND_BTN.addEventListener('click', async () => {
   const text = MESSAGE_INPUT.value.trim();
   if (!text) return;
   const pwd = PASSWORD_INPUT.value;
+  if (!pwd) {
+    if (!confirm('Send without password? recipients will not decrypt correctly. Continue?')) return;
+  }
   const enc = await encryptMessage(text, pwd, currentRoom);
-  appendMessage(
-    ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'You'),
-    text,
-    new Date().toLocaleTimeString() + " (you)"
-  );
+  const selfName = ANON_CHECK.checked ? null : (USERNAME_INPUT.value.trim() || 'You');
+  appendMessage(selfName, text, new Date().toLocaleTimeString() + ' (you)');
   receivedMessages.push({
     time: new Date().toISOString(),
     room: currentRoom,
-    username: USERNAME_INPUT.value || null,
+    username: USERNAME_INPUT.value.trim() || null,
     ciphertext: enc.ciphertext,
     iv: enc.iv,
     plaintextIfDecrypted: text
@@ -567,19 +677,27 @@ SEND_BTN.addEventListener('click', async () => {
   sendToServer({
     type: 'message',
     room: currentRoom,
-    username: ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'User'),
+    username: getCurrentUsername(),
     iv: enc.iv,
     ciphertext: enc.ciphertext
   });
   MESSAGE_INPUT.value = '';
+  autoResizeInput();
 });
 
 MESSAGE_INPUT.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     SEND_BTN.click();
   }
 });
+
+MESSAGE_INPUT.addEventListener('input', autoResizeInput);
+
+function autoResizeInput() {
+  MESSAGE_INPUT.style.height = 'auto';
+  MESSAGE_INPUT.style.height = Math.min(MESSAGE_INPUT.scrollHeight, 120) + 'px';
+}
 
 SAVE_BTN.addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(receivedMessages, null, 2)], { type: 'application/json' });
@@ -592,6 +710,45 @@ SAVE_BTN.addEventListener('click', () => {
   a.remove();
   URL.revokeObjectURL(url);
 });
+
+function renderUserList(users) {
+  USER_LIST.innerHTML = '';
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-item';
+    const name = u.username || 'Anonymous';
+    const isSelf = (u.id === myId);
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'user-name';
+    nameSpan.textContent = name;
+    if (isSelf) {
+      const badge = document.createElement('span');
+      badge.className = 'user-badge';
+      badge.textContent = '(you)';
+      nameSpan.appendChild(badge);
+    }
+    if (isCreator && isSelf) {
+      const badge = document.createElement('span');
+      badge.className = 'user-badge';
+      badge.textContent = 'creator';
+      nameSpan.appendChild(badge);
+    }
+    div.appendChild(nameSpan);
+
+    if (isCreator && !isSelf && currentRoom) {
+      const btn = document.createElement('button');
+      btn.className = 'kick-btn';
+      btn.textContent = 'Kick';
+      btn.addEventListener('click', () => {
+        if (!confirm(`Kick ${name}?`)) return;
+        sendToServer({ type: 'kick', room: currentRoom, targetId: u.id });
+      });
+      div.appendChild(btn);
+    }
+
+    USER_LIST.appendChild(div);
+  });
+}
 </script>
 </body>
 </html>
