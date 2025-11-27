@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ano-Chat</title>
+<title>Ano-Chat (1.1.0)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   
@@ -289,13 +289,12 @@
   </header>
 
   <div class="main-grid">
-    <!-- Settings Panel -->
     <div>
       <div class="panel">
         <div class="panel-title">Settings</div>
 
         <label>WebSocket Server</label>
-        <input id="wsUrl" type="text" value="wss://ano-app.onrender.com" />
+        <input id="wsUrl" type="text" value="wss://ano-app.onrender.com:10000" />
 
         <label>Room Code</label>
         <input id="roomCode" type="text" placeholder="16 character code" />
@@ -322,11 +321,10 @@
           Share the 16-character code and password with others to invite them to your chat.
         </div>
 
-        <div class="version">v1.0.9</div>
+        <div class="version">v1.1.0</div>
       </div>
     </div>
 
-    <!-- Chat Panel -->
     <div class="chat-container">
       <div class="panel" style="flex: 1; display: flex; flex-direction: column; padding: 0;">
         <div class="panel-title" style="margin: 0; padding: 16px; background: #fafafa; border-bottom: 1px solid #e0e0e0;">Messages</div>
