@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Ano-Chat (1.1.0)</title>
+<title>Ano-Chat (1.1.1)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   
@@ -321,7 +321,7 @@
           Share the 16-character code and password with others to invite them to your chat.
         </div>
 
-        <div class="version">v1.1.0</div>
+        <div class="version">v1.1.1</div>
       </div>
     </div>
 
@@ -345,6 +345,7 @@
 </div>
 
 <script>
+
 const WS_SERVER_INPUT = document.getElementById('wsUrl');
 const CREATE_BTN = document.getElementById('createBtn');
 const JOIN_BTN = document.getElementById('joinBtn');
@@ -370,7 +371,7 @@ function genRoomCode() {
   return s;
 }
 
-function addLog(text) {
+function addLog(text, cls = '') {
   const d = document.createElement('div');
   d.className = 'meta';
   d.textContent = text;
@@ -381,9 +382,9 @@ function addLog(text) {
 function appendMessage(displayName, text, meta) {
   const d = document.createElement('div');
   d.className = 'msg';
-  d.innerHTML = `<div class="msg-user">${displayName || 'Anonymous'}</div>
-                 <div class="msg-content">${text}</div>
-                 <div class="msg-time">${meta || ''}</div>`;
+  d.innerHTML = `<div style="font-weight:600">${displayName || 'Anonymous'}</div>
+                 <div>${text}</div>
+                 <div class="meta">${meta || ''}</div>`;
   MESSAGES.appendChild(d);
   MESSAGES.scrollTop = MESSAGES.scrollHeight;
 }
@@ -391,20 +392,22 @@ function appendMessage(displayName, text, meta) {
 function abToBase64(buf) {
   let bin = '';
   const bytes = new Uint8Array(buf);
-  for (let i=0;i<bytes.byteLength;i++) bin += String.fromCharCode(bytes[i]);
+  const len = bytes.byteLength;
+  for (let i=0;i<len;i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
-
 function base64ToAb(b64) {
   const bin = atob(b64);
-  const buf = new Uint8Array(bin.length);
-  for (let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
+  const len = bin.length;
+  const buf = new Uint8Array(len);
+  for (let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
   return buf.buffer;
 }
 
 async function roomSalt(room) {
   const enc = new TextEncoder();
-  const h = await crypto.subtle.digest('SHA-256', enc.encode(room));
+  const data = enc.encode(room);
+  const h = await crypto.subtle.digest('SHA-256', data);
   return new Uint8Array(h);
 }
 
@@ -446,7 +449,7 @@ function connectWs() {
   const url = WS_SERVER_INPUT.value.trim();
   ws = new WebSocket(url);
   ws.addEventListener('open', () => {
-    addLog('Connected to server');
+    addLog('Connected to relay server at ' + url);
   });
   ws.addEventListener('message', async (ev) => {
     let d;
@@ -456,15 +459,21 @@ function connectWs() {
     } else if (d.type === 'joined') {
       addLog('Joined room: ' + d.room);
     } else if (d.type === 'no-room') {
+      addLog('Room does not exist: ' + d.room);
       alert('Room not found.');
       leaveRoomLocal();
     } else if (d.type === 'message') {
       if (d.room !== currentRoom) return;
       const pwd = PASSWORD_INPUT.value;
       const decrypted = await decryptMessage(d.iv, d.ciphertext, pwd, d.room);
-      const display = decrypted === null ? '[decryption failed]' : decrypted;
+      let display;
+      if (decrypted === null) {
+        display = '[decryption failed — wrong password?]';
+      } else {
+        display = decrypted;
+      }
       const displayName = (ANON_CHECK.checked || !d.username) ? null : d.username;
-      appendMessage(displayName, display, new Date().toLocaleTimeString());
+      appendMessage(displayName, display, `${new Date().toLocaleTimeString()}`);
       receivedMessages.push({
         time: (new Date()).toISOString(),
         room: d.room,
@@ -478,22 +487,24 @@ function connectWs() {
       addLog('Server error: ' + (d.message || ''));
     }
   });
-  ws.addEventListener('close', () => addLog('Disconnected'));
-  ws.addEventListener('error', () => addLog('Connection error'));
+  ws.addEventListener('close', () => addLog('Disconnected from server'));
+  ws.addEventListener('error', (e) => addLog('WebSocket error'));
 }
 
 function sendToServer(obj) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
+    addLog('Not connected to server. Connecting automatically...');
     connectWs();
     setTimeout(() => {
       if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+      else addLog('Unable to send: not connected yet.');
     }, 300);
   } else {
     ws.send(JSON.stringify(obj));
   }
 }
 
-CREATE_BTN.addEventListener('click', () => {
+CREATE_BTN.addEventListener('click', async () => {
   connectWs();
   const room = genRoomCode();
   ROOM_INPUT.value = room;
@@ -503,27 +514,31 @@ CREATE_BTN.addEventListener('click', () => {
   joined = true;
   SEND_BTN.disabled = false;
   LEAVE_BTN.disabled = false;
+  addLog('Room created, share code & password with peers: ' + room);
 });
 
-JOIN_BTN.addEventListener('click', () => {
+JOIN_BTN.addEventListener('click', async () => {
   const room = ROOM_INPUT.value.trim();
-  if (!room || room.length !== 16) { alert('Invalid room code'); return; }
+  if (!room || room.length !== 16) { alert('Paste a 16-char room code'); return; }
   currentRoom = room;
   receivedMessages = [];
   connectWs();
+  sendToServer({ type: 'exists', room });
   setTimeout(() => {
     sendToServer({ type: 'join', room });
     joined = true;
     SEND_BTN.disabled = false;
     LEAVE_BTN.disabled = false;
+    addLog('Joining room: ' + room);
   }, 200);
 });
 
 LEAVE_BTN.addEventListener('click', () => {
+  leaveRoomLocal();
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'leave', room: currentRoom }));
   }
-  leaveRoomLocal();
+  addLog('Left room.');
 });
 
 function leaveRoomLocal() {
@@ -537,20 +552,20 @@ function leaveRoomLocal() {
 }
 
 SEND_BTN.addEventListener('click', async () => {
-  if (!joined || !currentRoom) return;
+  if (!joined || !currentRoom) { alert('Join or create a room first'); return; }
   const text = MESSAGE_INPUT.value.trim();
   if (!text) return;
   const pwd = PASSWORD_INPUT.value;
-  if (!pwd) { if (!confirm('Send without password?')) return; }
+  if (!pwd) { if (!confirm('Send without password? recipients will not decrypt correctly. Continue?')) return; }
   const enc = await encryptMessage(text, pwd, currentRoom);
-  sendToServer({
+  const payload = {
     type: 'message',
     room: currentRoom,
     username: ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'User'),
     iv: enc.iv,
     ciphertext: enc.ciphertext
-  });
-  appendMessage(ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'You'), text, new Date().toLocaleTimeString() + ' (you)');
+  };
+  appendMessage( ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'You'), text, `${new Date().toLocaleTimeString()} (you)`);
   receivedMessages.push({
     time: (new Date()).toISOString(),
     room: currentRoom,
@@ -560,6 +575,8 @@ SEND_BTN.addEventListener('click', async () => {
     plaintextIfDecrypted: text
   });
   SAVE_BTN.disabled = false;
+
+  sendToServer(payload);
   MESSAGE_INPUT.value = '';
 });
 
@@ -578,6 +595,7 @@ SAVE_BTN.addEventListener('click', () => {
   a.remove();
   URL.revokeObjectURL(url);
 });
+
 </script>
 </body>
 </html>
