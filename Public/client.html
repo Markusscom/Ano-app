@@ -1,0 +1,309 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Ano-Chat</title>
+<style>
+  body { font-family: system-ui, -apple-system, Arial; margin: 20px; max-width: 900px; }
+  .panel { border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+  label { display:block; margin-top:8px; }
+  input[type=text], input[type=password] { width: 100%; padding:8px; box-sizing: border-box; }
+  button { margin-top:10px; padding:8px 12px; }
+  #messages { height: 360px; overflow:auto; border:1px solid #eee; padding:8px; background:#fafafa; border-radius:6px; }
+  .msg { padding:6px; border-radius:6px; margin-bottom:6px; }
+  .meta { font-size:12px; color:#666; }
+</style>
+</head>
+<body>
+
+<h2>Ano-Chat</h2>
+
+<div class="panel" id="controls">
+  <strong>Server</strong><br>
+  WebSocket server: <input id="wsUrl" type="text" value="ws://localhost:10000" />
+  <div style="display:flex; gap:10px; margin-top:8px;">
+    <button id="createBtn">Create chat</button>
+    <button id="joinBtn">Join chat</button>
+    <button id="leaveBtn" disabled>Leave chat</button>
+  </div>
+
+  <label>Room code (16 chars) — generated when creating or paste to join:</label>
+  <input id="roomCode" type="text" placeholder="e.g. A1B2C3D4E5F6G7H8" />
+
+  <label>Username (temporary):</label>
+  <input id="username" type="text" placeholder="Your display name" />
+
+  <label><input type="checkbox" id="anonMode" /> Full anonymous (no usernames, floating messages)</label>
+
+  <label>Encryption password (shared secret):</label>
+  <input id="password" type="password" placeholder="choose a password (share with peers)" />
+
+  <div style="margin-top:6px; font-size:13px; color:#444;">
+    When you create a room, share the 16-char code + password with others. Messages are encrypted client-side with the password.
+  </div>
+</div>
+
+<div class="panel">
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input id="messageIn" type="text" style="flex:1" placeholder="Type message..." />
+    <button id="sendBtn" disabled>Send</button>
+    <button id="saveBtn" disabled>Save JSON</button>
+  </div>
+  <div id="messages" style="margin-top:10px"></div>
+</div>
+
+<script>
+
+const WS_SERVER_INPUT = document.getElementById('wsUrl');
+const CREATE_BTN = document.getElementById('createBtn');
+const JOIN_BTN = document.getElementById('joinBtn');
+const LEAVE_BTN = document.getElementById('leaveBtn');
+const ROOM_INPUT = document.getElementById('roomCode');
+const USERNAME_INPUT = document.getElementById('username');
+const ANON_CHECK = document.getElementById('anonMode');
+const PASSWORD_INPUT = document.getElementById('password');
+const MESSAGE_INPUT = document.getElementById('messageIn');
+const SEND_BTN = document.getElementById('sendBtn');
+const SAVE_BTN = document.getElementById('saveBtn');
+const MESSAGES = document.getElementById('messages');
+
+let ws = null;
+let currentRoom = null;
+let joined = false;
+let receivedMessages = [];
+
+function genRoomCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let s = "";
+  for (let i=0;i<16;i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+function addLog(text, cls = '') {
+  const d = document.createElement('div');
+  d.className = 'meta';
+  d.textContent = text;
+  MESSAGES.appendChild(d);
+  MESSAGES.scrollTop = MESSAGES.scrollHeight;
+}
+
+function appendMessage(displayName, text, meta) {
+  const d = document.createElement('div');
+  d.className = 'msg';
+  d.innerHTML = `<div style="font-weight:600">${displayName || 'Anonymous'}</div>
+                 <div>${text}</div>
+                 <div class="meta">${meta || ''}</div>`;
+  MESSAGES.appendChild(d);
+  MESSAGES.scrollTop = MESSAGES.scrollHeight;
+}
+
+function abToBase64(buf) {
+  let bin = '';
+  const bytes = new Uint8Array(buf);
+  const len = bytes.byteLength;
+  for (let i=0;i<len;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function base64ToAb(b64) {
+  const bin = atob(b64);
+  const len = bin.length;
+  const buf = new Uint8Array(len);
+  for (let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+
+async function roomSalt(room) {
+  const enc = new TextEncoder();
+  const data = enc.encode(room);
+  const h = await crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(h);
+}
+
+async function deriveKey(password, room) {
+  const enc = new TextEncoder();
+  const pwKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const salt = await roomSalt(room);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+    pwKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt','decrypt']
+  );
+}
+
+async function encryptMessage(plain, password, room) {
+  const key = await deriveKey(password, room);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plain));
+  return { iv: abToBase64(iv.buffer), ciphertext: abToBase64(ct) };
+}
+
+async function decryptMessage(iv_b64, ct_b64, password, room) {
+  try {
+    const key = await deriveKey(password, room);
+    const iv = base64ToAb(iv_b64);
+    const ct = base64ToAb(ct_b64);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(iv) }, key, ct);
+    return new TextDecoder().decode(pt);
+  } catch (e) {
+    return null;
+  }
+}
+
+function connectWs() {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  const url = WS_SERVER_INPUT.value.trim();
+  ws = new WebSocket(url);
+  ws.addEventListener('open', () => {
+    addLog('Connected to relay server at ' + url);
+  });
+  ws.addEventListener('message', async (ev) => {
+    let d;
+    try { d = JSON.parse(ev.data); } catch (e) { return; }
+    if (d.type === 'created') {
+      addLog('Room created: ' + d.room);
+    } else if (d.type === 'joined') {
+      addLog('Joined room: ' + d.room);
+    } else if (d.type === 'no-room') {
+      addLog('Room does not exist: ' + d.room);
+      alert('Room not found.');
+      leaveRoomLocal();
+    } else if (d.type === 'message') {
+      if (d.room !== currentRoom) return;
+      const pwd = PASSWORD_INPUT.value;
+      const decrypted = await decryptMessage(d.iv, d.ciphertext, pwd, d.room);
+      let display;
+      if (decrypted === null) {
+        display = '[decryption failed — wrong password?]';
+      } else {
+        display = decrypted;
+      }
+      const displayName = (ANON_CHECK.checked || !d.username) ? null : d.username;
+      appendMessage(displayName, display, `${new Date().toLocaleTimeString()}`);
+      receivedMessages.push({
+        time: (new Date()).toISOString(),
+        room: d.room,
+        username: d.username || null,
+        ciphertext: d.ciphertext,
+        iv: d.iv,
+        plaintextIfDecrypted: decrypted
+      });
+      SAVE_BTN.disabled = false;
+    } else if (d.type === 'error') {
+      addLog('Server error: ' + (d.message || ''));
+    }
+  });
+  ws.addEventListener('close', () => addLog('Disconnected from server'));
+  ws.addEventListener('error', (e) => addLog('WebSocket error'));
+}
+
+function sendToServer(obj) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    addLog('Not connected to server. Connecting automatically...');
+    connectWs();
+    setTimeout(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+      else addLog('Unable to send: not connected yet.');
+    }, 300);
+  } else {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+CREATE_BTN.addEventListener('click', async () => {
+  connectWs();
+  const room = genRoomCode();
+  ROOM_INPUT.value = room;
+  currentRoom = room;
+  receivedMessages = [];
+  sendToServer({ type: 'create', room });
+  joined = true;
+  SEND_BTN.disabled = false;
+  LEAVE_BTN.disabled = false;
+  addLog('Room created, share code & password with peers: ' + room);
+});
+
+JOIN_BTN.addEventListener('click', async () => {
+  const room = ROOM_INPUT.value.trim();
+  if (!room || room.length !== 16) { alert('Paste a 16-char room code'); return; }
+  currentRoom = room;
+  receivedMessages = [];
+  connectWs();
+  sendToServer({ type: 'exists', room });
+  setTimeout(() => {
+    sendToServer({ type: 'join', room });
+    joined = true;
+    SEND_BTN.disabled = false;
+    LEAVE_BTN.disabled = false;
+    addLog('Joining room: ' + room);
+  }, 200);
+});
+
+LEAVE_BTN.addEventListener('click', () => {
+  leaveRoomLocal();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'leave', room: currentRoom }));
+  }
+  addLog('Left room.');
+});
+
+function leaveRoomLocal() {
+  currentRoom = null;
+  joined = false;
+  SEND_BTN.disabled = true;
+  LEAVE_BTN.disabled = true;
+  MESSAGES.innerHTML = '';
+  receivedMessages = [];
+  SAVE_BTN.disabled = true;
+}
+
+SEND_BTN.addEventListener('click', async () => {
+  if (!joined || !currentRoom) { alert('Join or create a room first'); return; }
+  const text = MESSAGE_INPUT.value.trim();
+  if (!text) return;
+  const pwd = PASSWORD_INPUT.value;
+  if (!pwd) { if (!confirm('Send without password? recipients will not decrypt correctly. Continue?')) return; }
+  const enc = await encryptMessage(text, pwd, currentRoom);
+  const payload = {
+    type: 'message',
+    room: currentRoom,
+    username: ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'User'),
+    iv: enc.iv,
+    ciphertext: enc.ciphertext
+  };
+  appendMessage( ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'You'), text, `${new Date().toLocaleTimeString()} (you)`);
+  receivedMessages.push({
+    time: (new Date()).toISOString(),
+    room: currentRoom,
+    username: USERNAME_INPUT.value || null,
+    ciphertext: enc.ciphertext,
+    iv: enc.iv,
+    plaintextIfDecrypted: text
+  });
+  SAVE_BTN.disabled = false;
+
+  sendToServer(payload);
+  MESSAGE_INPUT.value = '';
+});
+
+MESSAGE_INPUT.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); SEND_BTN.click(); }
+});
+
+SAVE_BTN.addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(receivedMessages, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `chat-${currentRoom || 'session'}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+</script>
+</body>
+</html>
