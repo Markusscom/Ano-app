@@ -345,7 +345,6 @@
 </div>
 
 <script>
-
 const WS_SERVER_INPUT = document.getElementById('wsUrl');
 const CREATE_BTN = document.getElementById('createBtn');
 const JOIN_BTN = document.getElementById('joinBtn');
@@ -364,6 +363,9 @@ let currentRoom = null;
 let joined = false;
 let receivedMessages = [];
 
+CREATE_BTN.disabled = true;
+JOIN_BTN.disabled = true;
+
 function genRoomCode() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let s = "";
@@ -371,7 +373,7 @@ function genRoomCode() {
   return s;
 }
 
-function addLog(text, cls = '') {
+function addLog(text) {
   const d = document.createElement('div');
   d.className = 'meta';
   d.textContent = text;
@@ -392,28 +394,24 @@ function appendMessage(displayName, text, meta) {
 function abToBase64(buf) {
   let bin = '';
   const bytes = new Uint8Array(buf);
-  const len = bytes.byteLength;
-  for (let i=0;i<len;i++) bin += String.fromCharCode(bytes[i]);
+  for (let i=0;i<bytes.byteLength;i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
 function base64ToAb(b64) {
   const bin = atob(b64);
-  const len = bin.length;
-  const buf = new Uint8Array(len);
-  for (let i=0;i<len;i++) buf[i] = bin.charCodeAt(i);
+  const buf = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
   return buf.buffer;
 }
 
 async function roomSalt(room) {
-  const enc = new TextEncoder();
-  const data = enc.encode(room);
+  const data = new TextEncoder().encode(room);
   const h = await crypto.subtle.digest('SHA-256', data);
   return new Uint8Array(h);
 }
 
 async function deriveKey(password, room) {
-  const enc = new TextEncoder();
-  const pwKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  const pwKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
   const salt = await roomSalt(room);
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
@@ -427,33 +425,37 @@ async function deriveKey(password, room) {
 async function encryptMessage(plain, password, room) {
   const key = await deriveKey(password, room);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const enc = new TextEncoder();
-  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plain));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
   return { iv: abToBase64(iv.buffer), ciphertext: abToBase64(ct) };
 }
 
 async function decryptMessage(iv_b64, ct_b64, password, room) {
   try {
     const key = await deriveKey(password, room);
-    const iv = base64ToAb(iv_b64);
-    const ct = base64ToAb(ct_b64);
-    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(iv) }, key, ct);
+    const iv = new Uint8Array(base64ToAb(iv_b64));
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, base64ToAb(ct_b64));
     return new TextDecoder().decode(pt);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 
 function connectWs() {
   if (ws && ws.readyState === WebSocket.OPEN) return;
+
   const url = WS_SERVER_INPUT.value.trim();
   ws = new WebSocket(url);
+
   ws.addEventListener('open', () => {
     addLog('Connected to relay server at ' + url);
+    CREATE_BTN.disabled = false;
+    JOIN_BTN.disabled = false;
   });
+
   ws.addEventListener('message', async (ev) => {
     let d;
-    try { d = JSON.parse(ev.data); } catch (e) { return; }
+    try { d = JSON.parse(ev.data); } catch { return; }
+
     if (d.type === 'created') {
       addLog('Room created: ' + d.room);
     } else if (d.type === 'joined') {
@@ -464,18 +466,14 @@ function connectWs() {
       leaveRoomLocal();
     } else if (d.type === 'message') {
       if (d.room !== currentRoom) return;
-      const pwd = PASSWORD_INPUT.value;
-      const decrypted = await decryptMessage(d.iv, d.ciphertext, pwd, d.room);
-      let display;
-      if (decrypted === null) {
-        display = '[decryption failed — wrong password?]';
-      } else {
-        display = decrypted;
-      }
-      const displayName = (ANON_CHECK.checked || !d.username) ? null : d.username;
-      appendMessage(displayName, display, `${new Date().toLocaleTimeString()}`);
+      const decrypted = await decryptMessage(d.iv, d.ciphertext, PASSWORD_INPUT.value, d.room);
+      appendMessage(
+        (ANON_CHECK.checked || !d.username) ? null : d.username,
+        decrypted === null ? '[decryption failed — wrong password?]' : decrypted,
+        new Date().toLocaleTimeString()
+      );
       receivedMessages.push({
-        time: (new Date()).toISOString(),
+        time: new Date().toISOString(),
         room: d.room,
         username: d.username || null,
         ciphertext: d.ciphertext,
@@ -483,29 +481,27 @@ function connectWs() {
         plaintextIfDecrypted: decrypted
       });
       SAVE_BTN.disabled = false;
-    } else if (d.type === 'error') {
-      addLog('Server error: ' + (d.message || ''));
     }
   });
-  ws.addEventListener('close', () => addLog('Disconnected from server'));
-  ws.addEventListener('error', (e) => addLog('WebSocket error'));
+
+  ws.addEventListener('close', () => {
+    addLog('Disconnected from server');
+    CREATE_BTN.disabled = true;
+    JOIN_BTN.disabled = true;
+    setTimeout(connectWs, 500);
+  });
+
+  ws.addEventListener('error', () => {});
 }
 
 function sendToServer(obj) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    addLog('Not connected to server. Connecting automatically...');
-    connectWs();
-    setTimeout(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
-      else addLog('Unable to send: not connected yet.');
-    }, 300);
-  } else {
-    ws.send(JSON.stringify(obj));
-  }
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify(obj));
 }
 
-CREATE_BTN.addEventListener('click', async () => {
-  connectWs();
+connectWs();
+
+CREATE_BTN.addEventListener('click', () => {
   const room = genRoomCode();
   ROOM_INPUT.value = room;
   currentRoom = room;
@@ -517,12 +513,11 @@ CREATE_BTN.addEventListener('click', async () => {
   addLog('Room created, share code & password with peers: ' + room);
 });
 
-JOIN_BTN.addEventListener('click', async () => {
+JOIN_BTN.addEventListener('click', () => {
   const room = ROOM_INPUT.value.trim();
-  if (!room || room.length !== 16) { alert('Paste a 16-char room code'); return; }
+  if (!room || room.length !== 16) return alert('Paste a 16-char room code');
   currentRoom = room;
   receivedMessages = [];
-  connectWs();
   sendToServer({ type: 'exists', room });
   setTimeout(() => {
     sendToServer({ type: 'join', room });
@@ -534,10 +529,8 @@ JOIN_BTN.addEventListener('click', async () => {
 });
 
 LEAVE_BTN.addEventListener('click', () => {
+  sendToServer({ type: 'leave', room: currentRoom });
   leaveRoomLocal();
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: 'leave', room: currentRoom }));
-  }
   addLog('Left room.');
 });
 
@@ -552,22 +545,18 @@ function leaveRoomLocal() {
 }
 
 SEND_BTN.addEventListener('click', async () => {
-  if (!joined || !currentRoom) { alert('Join or create a room first'); return; }
+  if (!joined || !currentRoom) return alert('Join or create a room first');
   const text = MESSAGE_INPUT.value.trim();
   if (!text) return;
   const pwd = PASSWORD_INPUT.value;
-  if (!pwd) { if (!confirm('Send without password? recipients will not decrypt correctly. Continue?')) return; }
   const enc = await encryptMessage(text, pwd, currentRoom);
-  const payload = {
-    type: 'message',
-    room: currentRoom,
-    username: ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'User'),
-    iv: enc.iv,
-    ciphertext: enc.ciphertext
-  };
-  appendMessage( ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'You'), text, `${new Date().toLocaleTimeString()} (you)`);
+  appendMessage(
+    ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'You'),
+    text,
+    new Date().toLocaleTimeString() + " (you)"
+  );
   receivedMessages.push({
-    time: (new Date()).toISOString(),
+    time: new Date().toISOString(),
     room: currentRoom,
     username: USERNAME_INPUT.value || null,
     ciphertext: enc.ciphertext,
@@ -575,13 +564,21 @@ SEND_BTN.addEventListener('click', async () => {
     plaintextIfDecrypted: text
   });
   SAVE_BTN.disabled = false;
-
-  sendToServer(payload);
+  sendToServer({
+    type: 'message',
+    room: currentRoom,
+    username: ANON_CHECK.checked ? null : (USERNAME_INPUT.value || 'User'),
+    iv: enc.iv,
+    ciphertext: enc.ciphertext
+  });
   MESSAGE_INPUT.value = '';
 });
 
 MESSAGE_INPUT.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); SEND_BTN.click(); }
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    SEND_BTN.click();
+  }
 });
 
 SAVE_BTN.addEventListener('click', () => {
@@ -595,7 +592,6 @@ SAVE_BTN.addEventListener('click', () => {
   a.remove();
   URL.revokeObjectURL(url);
 });
-
 </script>
 </body>
 </html>
